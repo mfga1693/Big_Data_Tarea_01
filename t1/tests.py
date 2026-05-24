@@ -256,10 +256,36 @@ def test_calculate_province_totals(spark_session):
     """
     Test province totals aggregation.
     """
+    joined_data = [
+        (117860659, "Liz", "San Jose", date(2026, 5, 1), 18.5),
+        (117860659, "Liz", "San Jose", date(2026, 5, 2), 32.0),
+        (402200492, "Fernanda", "Alajuela", date(2026, 5, 1), 24.5),
+        (402500696, "Andres", "Cartago", date(2026, 5, 3), 40.0),
+    ]
 
-    # TODO
+    df = spark_session.createDataFrame(
+        joined_data,
+        [
+            "cedula",
+            "nombre_completo",
+            "provincia",
+            "fecha",
+            "kilometros"
+        ]
+    )
 
-    pass
+    result = calculate_province_totals(df)
+
+    rows - result.collect()
+    
+    totals = {
+        row.provincia: row.total_kilometros_provincia
+        for row in result.collect()
+    }
+
+    assert totals["San Jose" == 50.5]
+    assert totals["Alajuela" == 24.5]
+    assert totals["Cartago" == 50.5]
 
 
 # =========================================================
@@ -268,27 +294,148 @@ def test_calculate_province_totals(spark_session):
 #Fer
 def test_get_top_cyclists_by_total_km(spark_session):
     """
-    Test top cyclists ranking by total kilometers.
+    Prueba el top de ciclistas según el total de kilómetros recorridos por provincia.
     """
 
-    # TODO:
-    #
-    # Create dataframe
-    # Execute ranking
-    # Validate order
-    # Validate top N
+    total_km_data = [
+        (402200492, "Liz", "San Jose", 100),
+        (402200493, "Fernanda", "San Jose", 200.0),
+        (402200494, "Andres", "San Jose", 300.0),
+        (402200495, "Jesus", "San Jose", 400.0),
+        (402200496, "Rodrigo", "San Jose", 500.0),
+        (402200497, "Paula", "San Jose", 600.0),
+        (402200498, "Theo", "San Jose", 700.0),
 
-    pass
+        (402200499 "Juan", "Alajuela", 100.0),
+        (402200411, "Erick", "Alajuela", 200.0),
+        (402200412, "Mauricio", "Alajuela", 300.0),
+        (402200413, "Federico", "Alajuela", 400.0),
+        (402200414, "Mariela", "Alajuela", 500.0),
+        (402200415, "Ariana", "Alajuela", 600.0),
+        (402200416, "Mariana", "Alajuela", 700.0),
+        (402200417, "Celeste", "Alajuela", 800.0),
+    ]  
+
+    df = spark_session.createDataFrame(
+        total_km_data,
+        [
+            "cedula",
+            "nombre_completo",
+            "provincia",
+            "total_kilometros"
+        ]
+    )
+
+    result = get_top_cyclists_by_total_km(df, top_n = 5)
+
+    rows = result.collect()
+
+    san_jose = [
+        row for row in rows
+        if row.provincia == "San Jose"
+    ] 
+
+    alajuela = [
+        row for row in rows
+        if row.provincia == "Alajuela"
+    ] 
+
+    #Se valida la cantidad de datos del top N
+    assert len(san_jose) == 5
+    assert len(alajuela) == 5
+
+    #Se ordena los datos
+    san_jose = sorted(
+        san_jose,
+        key=lambda x: x.total_kilometros,
+        reverse=True
+    )
+
+    alajuela = sorted(
+        alajuela,
+        key=lambda x: x.total_kilometros,
+        reverse=True
+    )
+
+    # Validar ranking San Jose
+    assert san_jose[0].nombre_completo == "Theo"
+    assert san_jose[1].nombre_completo == "Paula"
+    assert san_jose[2].nombre_completo == "Rodrigo"
+    assert san_jose[3].nombre_completo == "Jesus"
+    assert san_jose[4].nombre_completo == "Andres"
+
+    # Validar ranking Alajuela
+    assert alajuela[0].nombre_completo == "Celeste"
+    assert alajuela[1].nombre_completo == "Mariana"
+    assert alajuela[2].nombre_completo == "Ariana"
+    assert alajuela[3].nombre_completo == "Mariela"
+    assert alajuela[4].nombre_completo == "Federico"
+
+
 
 #Fer
 def test_get_top_cyclists_by_daily_average(spark_session):
     """
-    Test top cyclists ranking by daily average.
+    Prueba el top de ciclistas según el promedio diario de kilómetros recorridos por provincia.
     """
 
-    # TODO
+    daily_average_data = [
+        (117860659, "Liz", "San Jose", 25.5),
+        (402200492, "Fernanda", "San Jose", 42.0),
+        (402500696, "Andres", "San Jose", 30.0),
 
-    pass
+        (301110111, "Carlos", "Alajuela", 50.0),
+        (401220333, "Maria", "Alajuela", 22.5),
+        (501330444, "Sofia", "Alajuela", 45.0),
+    ]
+
+    df = spark_session.createDataFrame(
+        daily_average_data,
+        [
+            "cedula", 
+            "nombre_completo", 
+            "provincia", 
+            "promedio_diario_kilometros"
+        ]
+    )
+
+    result = get_top_cyclists_by_daily_average(df, top_n=2)
+    rows = result.collect()
+
+    san_jose = [
+        row for row in rows
+        if row.provincia == "San Jose"
+    ]
+
+    alajuela = [
+        row for row in rows
+        if row.provincia == "Alajuela"
+    ]
+
+    #Se valida la cantidad de datos del top N
+    assert len(san_jose) == 2
+    assert len(alajuela) == 2
+
+    #Se ordena los datos
+    san_jose = sorted(
+        san_jose,
+        key=lambda x: x.promedio_diario_kilometros,
+        reverse=True
+    )
+
+    alajuela = sorted(
+        alajuela,
+        key=lambda x: x.promedio_diario_kilometros,
+        reverse=True
+    )
+
+    # Validar ranking San Jose
+    assert san_jose[0].nombre_completo == "Fernanda"
+    assert san_jose[1].nombre_completo == "Andres"
+
+    # Validar ranking Alajuela
+    assert alajuela[0].nombre_completo == "Carlos"
+    assert alajuela[1].nombre_completo == "Sofia"
 
 
 # =========================================================
@@ -297,29 +444,74 @@ def test_get_top_cyclists_by_daily_average(spark_session):
 #Fer
 def test_empty_dataframe(spark_session):
     """
-    Test empty dataframe behavior.
+    Prueba el comportamiento de un dataframe vacío.
     """
+    empty_df = spark_session.createDataFrame(
+        [],
+        [
+            "cedula",
+            "nombre_completo",
+            "provincia",
+            "fecha",
+            "kilometros"
+        ]
+    )
+    
+    result = validate_dataframe(empty_df)
 
-    # TODO
-
-    pass
+    assert result == True
 
 #Fer
 def test_null_values(spark_session):
     """
-    Test null handling.
+    Prueba el manejo de valores nulos.
     """
 
-    # TODO
+    data_with_nulls = [
+        (117860659, None, "San Jose", date(2026, 5, 1), 18.5),
+        (402200492, "Fernanda", "Alajuela", date(2026, 5, 1), None),
+        (402500696, "Andres", None, date(2026, 5, 3), 40.0),
+    ]
 
-    pass
+    df = spark_session.createDataFrame(
+        data_with_nulls,
+        [
+            "cedula",
+            "nombre_completo",
+            "provincia",
+            "fecha",
+            "kilometros"
+        ]
+    )
+
+    result = validate_dataframe(df)
+
+    assert result == True
 
 #Fer
 def test_duplicate_activities(spark_session):
     """
-    Test duplicated activity handling.
+    Prueba el manejo de actividades duplicadas.
     """
 
-    # TODO
+    data_with_duplicates = [
+        (117860659, "Liz", "San Jose", date(2026, 5, 1), 18.5),
+        (117860659, "Liz", "San Jose", date(2026, 5, 1), 18.5),
+        (402200492, "Fernanda", "Alajuela", date(2026, 5, 1), 24.5),
+        (402500696, "Andres", "Cartago", date(2026, 5, 3), 40.0),
+    ]
 
-    pass
+    df = spark_session.createDataFrame(
+        data_with_duplicates,
+        [
+            "cedula",
+            "nombre_completo",
+            "provincia",
+            "fecha",
+            "kilometros"
+        ]
+    )
+
+    result = validate_dataframe(df)
+
+    assert result == True
