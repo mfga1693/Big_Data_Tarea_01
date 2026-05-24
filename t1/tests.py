@@ -8,6 +8,8 @@ from pyspark.sql import Row
 from datetime import date
 
 from pyspark.sql.types import (
+    StructField,
+    StructType,
     DateType,
     FloatType,
     IntegerType,
@@ -23,7 +25,8 @@ from functions.functions import (
     calculate_daily_average,
     calculate_province_totals,
     get_top_cyclists_by_total_km,
-    get_top_cyclists_by_daily_average
+    get_top_cyclists_by_daily_average,
+    validate_dataframe
 )
 
 #Función auxiliar
@@ -276,16 +279,15 @@ def test_calculate_province_totals(spark_session):
 
     result = calculate_province_totals(df)
 
-    rows - result.collect()
     
     totals = {
         row.provincia: row.total_kilometros_provincia
         for row in result.collect()
     }
 
-    assert totals["San Jose" == 50.5]
-    assert totals["Alajuela" == 24.5]
-    assert totals["Cartago" == 50.5]
+    assert totals["San Jose"] == 50.5
+    assert totals["Alajuela"] == 24.5
+    assert totals["Cartago"] == 40.0
 
 
 # =========================================================
@@ -298,7 +300,7 @@ def test_get_top_cyclists_by_total_km(spark_session):
     """
 
     total_km_data = [
-        (402200492, "Liz", "San Jose", 100),
+        (402200492, "Liz", "San Jose", 100.0),
         (402200493, "Fernanda", "San Jose", 200.0),
         (402200494, "Andres", "San Jose", 300.0),
         (402200495, "Jesus", "San Jose", 400.0),
@@ -306,7 +308,7 @@ def test_get_top_cyclists_by_total_km(spark_session):
         (402200497, "Paula", "San Jose", 600.0),
         (402200498, "Theo", "San Jose", 700.0),
 
-        (402200499 "Juan", "Alajuela", 100.0),
+        (402200499, "Juan", "Alajuela", 100.0),
         (402200411, "Erick", "Alajuela", 200.0),
         (402200412, "Mauricio", "Alajuela", 300.0),
         (402200413, "Federico", "Alajuela", 400.0),
@@ -447,19 +449,20 @@ def test_empty_dataframe(spark_session):
     Prueba el comportamiento de un dataframe vacío.
     """
     empty_df = spark_session.createDataFrame(
-        [],
-        [
-            "cedula",
-            "nombre_completo",
-            "provincia",
-            "fecha",
-            "kilometros"
-        ]
+        [], StructType(
+                [
+                    StructField("cedula", IntegerType()),
+                    StructField("nombre_completo", StringType()),
+                    StructField("provincia", StringType()),
+                    StructField("fecha", DateType()),
+                    StructField("kilometros", FloatType())
+                ]
+            )
     )
     
     result = validate_dataframe(empty_df)
 
-    assert result == True
+    assert result == False
 
 #Fer
 def test_null_values(spark_session):

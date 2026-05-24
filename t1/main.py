@@ -87,9 +87,9 @@ def main():
     # Show results
     # -----------------------------------------------------
     print("\n===Top 5 ciclistas por total de kilómetros recorridos:===")
-    top_total_km.show()
+    top_total_km.show(50)
     print("\n===Top 5 ciclistas por promedio diario de kilómetros recorridos:===")
-    top_daily_average.show()
+    top_daily_average.show(50)
     # -----------------------------------------------------
     # Stop Spark session
     # -----------------------------------------------------
