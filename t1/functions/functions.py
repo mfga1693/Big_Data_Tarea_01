@@ -163,5 +163,44 @@ def get_top_cyclists_by_daily_average(daily_average_df, top_n=5):
     ranked_df = daily_average_df.withColumn("rank", row_number().over(window_spec))
     return ranked_df.filter(col("rank") <= top_n).drop("rank")  
 
+# =========================================================
+# Utility functions
+# =========================================================
+#Función de utilidad para validar que los DataFrames no estén vacíos y tengan las columnas esperadas.
+def validate_dataframe(df, columnas_esperadas=None):
+    """
+    Función de utilidad para validar que los DataFrames no estén vacíos y tengan las columnas esperadas.
+    Esto puede ayudar a detectar problemas de carga o joins antes de realizar cálculos.
+    """
+        # Verificar que el DataFrame no esté vacío antes de procesarlo
+    count = df.count()
+    if count == 0:
+        print("Warning: El DataFrame está vacío.")
+        return False
+    # Si se pasan columnas esperadas, verificar que todas existan en el DataFrame
+    if columnas_esperadas:
+        for col_name in columnas_esperadas:
+            if col_name not in df.columns:
+                print(f"Warning: Falta la columna '{col_name}' en el DataFrame.")
+                return False
+    # Verificar duplicados
+    if count != df.dropDuplicates().count():
+        print("Warning: El DataFrame tiene filas duplicadas")
+    # Verificar kilometros negativos 
+    if "kilometros" in df.columns:
+        negativos = df.filter(col("kilometros") < 0).count()
+        if negativos > 0:
+            print(f"Warning: {negativos} filas con kilómetros negativos")
+    # Verificar nulos en cada columna, spark convierte datos incorrectos a null al leer con schema
+    # Por ejemplo, una cedula en texto quedaria como NULL en vez de lanzar un error
+    for col_name in df.columns:
+        nulos = df.filter(col(col_name).isNull()).count()
+        if nulos > 0:
+            print(f"Warning: {nulos} filas con nulos en columna {col_name}")
+    print("DataFrame validado correctamente.")
+    return True
+
+   
+
 
 
