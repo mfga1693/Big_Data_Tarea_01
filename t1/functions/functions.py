@@ -5,7 +5,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import SparkSession
 
 #Para funciones de agregacion y ordenamiento
-from pyspark.sql.functions import col, sum, avg, count, desc, dense_rank
+from pyspark.sql.functions import col, sum, avg, count, desc, dense_rank, row_number
 
 #Para definir esquemas de los DataFrames
 #Evitar que Spark infiera los tipos de datos incorrectamente
@@ -14,6 +14,10 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 #Para definir ventanas de ranking
 from pyspark.sql.window import Window
 
+
+# =========================================================
+# Schemas
+# =========================================================
 #Definir esquemas para los DataFrames de ciclista, ruta y actividad, para eviatr que spark los infiera
 #Definir esquemas para el dataframe de clicista.csv
 #cedula, nombre y provincia del ciclista
@@ -39,7 +43,10 @@ schema_actividad = StructType([
     StructField("fecha", DateType(), False)
 ])
 
-#Funciones de carga
+# =========================================================
+# Load functions
+# =========================================================
+
 """
 Estas funciones reciben la SparkSession y la ruta del archivo .csv, 
 lee el csv sin encabezado (header=False) y con el esquema definido (schema=schema_xxx),
@@ -58,10 +65,12 @@ def load_routes(spark, file_path):
 #Funcion de carga para actividad.csv
 def load_activities(spark, file_path):
     """Carga actividad.csv y retorna un DataFrame."""
-    return spark.read.csv(file_path, header=False, schema=schema_actividad)
+    return spark.read.csv(file_path, header=False, schema=schema_actividad, dateFormat="yyyy-MM-dd")
 
 
-#Funciones para hacer el joinS entre los DataFrames
+# =========================================================
+# Join functions
+# =========================================================
 """
 Importante: se usa left join para mantener todos los ciclistas aunque no tengan actividades o rutas asociadas
 """
@@ -91,7 +100,9 @@ def join_data(ciclistas_df, rutas_df, actividades_df):
     return resultado_df
 
 
-#Funciones para los cálculos
+# =========================================================
+# Aggregation functions
+# =========================================================
 
 #Funcion para calcular el total de kilometros recorridos por cada ciclista
 def calculate_total_kilometers(joined_df):
@@ -99,7 +110,7 @@ def calculate_total_kilometers(joined_df):
     Esta funcion grupa por cedula y nombre completo, luego suma los kilometros de las rutas asociadas a cada ciclista
     El "groupBy" agrupa los datos por ciclista, y el "agg" aplica la función de suma a la columna de kilometros, lo que termina en "total_kilometros"
     """
-    return joined_df.groupBy("cedula", "nombre_completo", "provincia").agg(sum("kilometros").alias("total_kilometros"))
+    return joined_df.filter(col("kilometros").isNotNull()).groupBy("cedula", "nombre_completo", "provincia").agg(sum("kilometros").alias("total_kilometros"))
 
 #Funcion para calcular el total de kilometros recorridos por provincia
 def calculate_province_totals(joined_df):
@@ -107,7 +118,7 @@ def calculate_province_totals(joined_df):
     Esta funcion agrupa por provincia, luego suma los kilometros de las rutas asociadas a cada provincia
     El "groupBy" agrupa los datos por provincia, y el "agg" aplica la función de suma a la columna de kilometros, lo que termina en "total_kilometros_provincia"
     """
-    return joined_df.groupBy("provincia").agg(sum("kilometros").alias("total_kilometros_provincia"))
+    return joined_df.filter(col("kilometros").isNotNull()).groupBy("provincia").agg(sum("kilometros").alias("total_kilometros_provincia"))
 
 #Funcion para calcular el promedio diario de kilometros recorridos por cada ciclista
 def calculate_daily_average(joined_df):
@@ -115,12 +126,14 @@ def calculate_daily_average(joined_df):
     Esta funcion agrupa por cedula y nombre completo, luego calcula el promedio de kilometros por dia
     El "groupBy" agrupa los datos por ciclista, y el "agg" aplica la función de promedio a la columna de kilometros, lo que termina en "promedio_diario_kilometros"
     """
-    Km_por_dia = joined_df.groupBy("cedula", "nombre_completo", "provincia", "fecha").agg(sum("kilometros").alias("kilometros_por_dia"))
+    Km_por_dia = joined_df.filter(col("kilometros").isNotNull()).groupBy("cedula", "nombre_completo", "provincia", "fecha").agg(sum("kilometros").alias("kilometros_por_dia"))
     return Km_por_dia.groupBy("cedula", "nombre_completo", "provincia").agg(avg("kilometros_por_dia").alias("promedio_diario_kilometros"))
 
 
 
-#Funcion para obtener el tops 
+# =========================================================
+# Ranking functions
+# =========================================================
 """ 
 Importante:
 .orderBy(desc("columna")):Ordena el DataFrame por total de kilometros en orden descendente 
@@ -129,26 +142,26 @@ Importante:
 """
 
 #Funcion para obtener el top ciclistas segun el total de kilometros recorridos por provincia
-def get_top_cyclists_by_total_km(total_km_df, n=5):
+def get_top_cyclists_by_total_km(total_km_df, top_n=5):
     """
     Recibe el DataFrame con totales por ciclista y retorna el top N por provincia.
     Usa una Window function para rankear dentro de cada provincia por km totales
     en orden descendente. Sin esto, el ranking sería global y no por provincia.
     """
     window_spec = Window.partitionBy("provincia").orderBy(desc("total_kilometros"))
-    ranked_df = total_km_df.withColumn("rank", dense_rank().over(window_spec))
-    return ranked_df.filter(col("rank") <= n).drop("rank")
+    ranked_df = total_km_df.withColumn("rank", row_number().over(window_spec))
+    return ranked_df.filter(col("rank") <= top_n).drop("rank")
 
 #Funcion para obtener el top ciclistas segun el promedio diario de kilometros recorridos por provincia
-def get_top_cyclists_by_daily_average(daily_average_df, n=5):
+def get_top_cyclists_by_daily_average(daily_average_df, top_n=5):
     """
     Esta función recibe el DataFrame con promedios diarios por ciclista y retorna el top N por provincia.
     Usa una Window function para rankear dentro de cada provincia por promedio diario de km en orden
     descendente. Sin esto, el ranking sería global y no por provincia.
     """
     window_spec = Window.partitionBy("provincia").orderBy(desc("promedio_diario_kilometros"))
-    ranked_df = daily_average_df.withColumn("rank", dense_rank().over(window_spec))
-    return ranked_df.filter(col("rank") <= n).drop("rank")  
+    ranked_df = daily_average_df.withColumn("rank", row_number().over(window_spec))
+    return ranked_df.filter(col("rank") <= top_n).drop("rank")  
 
 
 
