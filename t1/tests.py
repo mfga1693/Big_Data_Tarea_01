@@ -14,7 +14,7 @@ from pyspark.sql.types import (
     StringType
 )
 
-from functions import (
+from functions.functions import (
     load_cyclists,
     load_routes,
     load_activities,
